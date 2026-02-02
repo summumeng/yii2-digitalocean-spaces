@@ -5,9 +5,10 @@ namespace bilberrry\spaces\commands;
 use Aws\ResultInterface;
 use bilberrry\spaces\base\commands\ExecutableCommand;
 use bilberrry\spaces\base\commands\traits\Async;
+use bilberrry\spaces\base\commands\traits\Options;
 use bilberrry\spaces\interfaces\commands\Asynchronous;
-use bilberrry\spaces\interfaces\commands\HasAcl;
 use bilberrry\spaces\interfaces\commands\HasSpace;
+use bilberrry\spaces\interfaces\commands\PlainCommand;
 use GuzzleHttp\Promise\PromiseInterface;
 
 /**
@@ -17,31 +18,20 @@ use GuzzleHttp\Promise\PromiseInterface;
  *
  * @package bilberrry\spaces\commands
  */
-class CopyCommand extends ExecutableCommand implements HasSpace, HasAcl, Asynchronous
+class CopyCommand extends ExecutableCommand implements PlainCommand, HasSpace, Asynchronous
 {
     use Async;
-
-    /** @var string */
-    protected $space;
-
-    /** @var string */
-    protected $acl;
-
-    /** @var mixed */
-    protected $copysource;
-
-    /** @var string */
-    protected $filename;
+    use Options;
 
     /** @var array */
-    protected $options = [];
+    protected $args = [];
 
     /**
      * @return string
      */
     public function getSpace(): string
     {
-        return (string)$this->space;
+        return $this->args['Bucket'] ?? '';
     }
 
     /**
@@ -51,57 +41,21 @@ class CopyCommand extends ExecutableCommand implements HasSpace, HasAcl, Asynchr
      */
     public function inSpace(string $name)
     {
-        $this->space = $name;
+        $this->args['Bucket'] = $name;
 
         return $this;
     }
 
     /**
-     * @return string
-     */
-    public function getAcl(): string
-    {
-        return (string)$this->acl;
-    }
-
-    /**
-     * @param string $acl
+     * @param string $copysource
      *
      * @return $this
      */
-    public function withAcl(string $acl)
+    public function withCopySource(string $copysource)
     {
-        $this->acl = $acl;
+        $this->args['CopySource'] = $copysource;
 
         return $this;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getCopySource()
-    {
-        return $this->copysource;
-    }
-
-    /**
-     * @param mixed $source
-     *
-     * @return $this
-     */
-    public function withCopySource($copysource)
-    {
-        $this->copysource = $copysource;
-
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getFilename(): string
-    {
-        return (string)$this->filename;
     }
 
     /**
@@ -111,53 +65,35 @@ class CopyCommand extends ExecutableCommand implements HasSpace, HasAcl, Asynchr
      */
     public function withFilename(string $filename)
     {
-        $this->filename = $filename;
+        $this->args['Key'] = $filename;
 
         return $this;
     }
-
 
     /**
      * @return string
      */
-    public function getContentType(): string
+    public function getCopySource(): string
     {
-        return $this->getParam('ContentType', '');
+        return $this->args['CopySource'] ?? '';
     }
 
     /**
-     * @param string $contentType
-     *
-     * @return $this
+     * @return string
      */
-    public function withContentType(string $contentType)
+    public function getFilename(): string
     {
-        return $this->withParam('ContentType', $contentType);
-    }
-
-
-    /**
-     * @param string $name
-     * @param mixed  $default
-     *
-     * @return mixed
-     */
-    public function getParam(string $name, $default = null)
-    {
-        return $this->options['params'][$name] ?? $default;
+        return $this->args['Key'] ?? '';
     }
 
     /**
-     * @param string $name
-     * @param mixed  $value
+     * @internal used by the handlers
      *
-     * @return $this
+     * @return string
      */
-    public function withParam(string $name, $value)
+    public function getName(): string
     {
-        $this->options['params'][$name] = $value;
-
-        return $this;
+        return 'CopyObject';
     }
 
     /**
@@ -165,8 +101,25 @@ class CopyCommand extends ExecutableCommand implements HasSpace, HasAcl, Asynchr
      *
      * @return array
      */
-    public function getOptions(): array
+    public function toArgs(): array
     {
-        return $this->options;
+        $args = array_replace($this->options, $this->args);
+        
+        // Set default bucket if not specified
+        if (empty($args['Bucket'])) {
+            $args['Bucket'] = $this->client->getBucket();
+        }
+        
+        // Format CopySource for S3
+        if (isset($args['CopySource'])) {
+            // If CopySource doesn't have a bucket, add current bucket
+            if (strpos($args['CopySource'], '/') === false) {
+                $args['CopySource'] = $args['Bucket'] . '/' . $args['CopySource'];
+            }
+            // URL encode as required by S3
+            $args['CopySource'] = urlencode($args['CopySource']);
+        }
+        
+        return $args;
     }
 }
