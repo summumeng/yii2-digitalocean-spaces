@@ -101,41 +101,37 @@ class CopyCommand extends ExecutableCommand implements PlainCommand, HasSpace, A
      *
      * @return array
      */
-    public function toArgs(): array
-    {
-        $args = array_replace($this->options, $this->args);
+public function toArgs(): array
+{
+    $args = array_replace($this->options, $this->args);
+    
+    // Ensure bucket is set
+    $bucket = $args['Bucket'] ?? $this->client->getBucket();
+    $args['Bucket'] = $bucket;
+    
+    // Handle CopySource
+    if (isset($args['CopySource'])) {
+        $source = $args['CopySource'];
         
-        // Set default bucket if not specified
-        if (empty($args['Bucket'])) {
-            $args['Bucket'] = $this->client->getBucket();
-        }
+        // Remove leading slash if present
+        $source = ltrim($source, '/');
         
-        // DigitalOcean Spaces specific formatting
-        if (isset($args['CopySource'])) {
-            $copySource = $args['CopySource'];
-            
-            // Remove any existing leading slash to avoid double slashes
-            $copySource = ltrim($copySource, '/');
-            
-            // If it doesn't contain a slash, it's just a key
-            if (strpos($copySource, '/') === false) {
-                // Format as /bucket/key for DigitalOcean
-                $copySource = $args['Bucket'] . '/' . $copySource;
-            }
-            
-            // Add leading slash as per DigitalOcean documentation
-            $args['CopySource'] = '/' . $copySource;
-            
-            // DigitalOcean might require URL encoding for special characters
-            // But not for forward slashes
-            $args['CopySource'] = str_replace('%2F', '/', urlencode($args['CopySource']));
-        }
+        // Always prepend bucket name for same-bucket copy
+        $fullSource = $bucket . '/' . $source;
         
-        // Clean destination key
-        if (isset($args['Key'])) {
-            $args['Key'] = ltrim($args['Key'], '/');
-        }
+        // Format as /bucket/key for DigitalOcean
+        $args['CopySource'] = '/' . $fullSource;
         
-        return $args;
+        // IMPORTANT: DigitalOcean needs slashes NOT encoded
+        // Only encode everything else
+        $args['CopySource'] = '/' . implode('/', array_map('rawurlencode', explode('/', $fullSource)));
     }
+    
+    // Clean destination
+    if (isset($args['Key'])) {
+        $args['Key'] = ltrim($args['Key'], '/');
+    }
+    
+    return $args;
+}
 }
