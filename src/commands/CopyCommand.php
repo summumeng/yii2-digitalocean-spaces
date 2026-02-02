@@ -11,7 +11,7 @@ use bilberrry\spaces\interfaces\commands\HasSpace;
 use GuzzleHttp\Promise\PromiseInterface;
 
 /**
- * Class UploadCommand
+ * Class CopyCommand
  *
  * @method ResultInterface|PromiseInterface execute()
  *
