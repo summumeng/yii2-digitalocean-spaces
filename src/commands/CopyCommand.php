@@ -110,14 +110,30 @@ class CopyCommand extends ExecutableCommand implements PlainCommand, HasSpace, A
             $args['Bucket'] = $this->client->getBucket();
         }
         
-        // Format CopySource for S3
+        // DigitalOcean Spaces specific formatting
         if (isset($args['CopySource'])) {
-            // If CopySource doesn't have a bucket, add current bucket
-            if (strpos($args['CopySource'], '/') === false) {
-                $args['CopySource'] = $args['Bucket'] . '/' . $args['CopySource'];
+            $copySource = $args['CopySource'];
+            
+            // Remove any existing leading slash to avoid double slashes
+            $copySource = ltrim($copySource, '/');
+            
+            // If it doesn't contain a slash, it's just a key
+            if (strpos($copySource, '/') === false) {
+                // Format as /bucket/key for DigitalOcean
+                $copySource = $args['Bucket'] . '/' . $copySource;
             }
-            // URL encode as required by S3
-            $args['CopySource'] = urlencode($args['CopySource']);
+            
+            // Add leading slash as per DigitalOcean documentation
+            $args['CopySource'] = '/' . $copySource;
+            
+            // DigitalOcean might require URL encoding for special characters
+            // But not for forward slashes
+            $args['CopySource'] = str_replace('%2F', '/', urlencode($args['CopySource']));
+        }
+        
+        // Clean destination key
+        if (isset($args['Key'])) {
+            $args['Key'] = ltrim($args['Key'], '/');
         }
         
         return $args;
