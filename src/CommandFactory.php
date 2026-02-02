@@ -2,6 +2,7 @@
 
 namespace bilberrry\spaces;
 
+use bilberrry\spaces\commands\CopyCommand;
 use bilberrry\spaces\commands\DeleteCommand;
 use bilberrry\spaces\commands\ExistCommand;
 use bilberrry\spaces\commands\GetCommand;
@@ -46,6 +47,21 @@ class CommandFactory
 
         return $command;
     }
+
+    /**
+     * @param string $filename
+     * @param string $copysource
+     *
+     * @return \bilberrry\spaces\commands\CopyCommand
+     */
+    public function copy(string $copysource, string $filename): CopyCommand
+    {
+        /** @var CopyCommand $command */
+        $command = $this->builder->build(CopyCommand::class);
+        $command->withCopySource($copysource)->withFilename($filename);        
+        
+        return $command;
+    }    
 
     /**
      * @param string $filename
